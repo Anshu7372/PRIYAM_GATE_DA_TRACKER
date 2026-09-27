@@ -202,7 +202,10 @@
     const t = today();
     return ALL_TOPICS.filter(x => { const st = S.topics[x.id]; return st && st.done && !S.rev[x.id] && st.revs < 3 && addDays(st.done, ROUTINE_REV[st.revs]) <= t; });
   }
-  function updateBadge() { const n = dueRev().length + dueRoutine().length; $("#revBadge").textContent = n ? n : ""; }
+  function updateBadge() {
+    const n = dueRev().length + dueRoutine().length; $("#revBadge").textContent = n ? n : "";
+    const e = $("#errBadge"); if (e) { const m = errorLog().length; e.textContent = m ? m : ""; }
+  }
 
   /* ================= Claude prompts ================= */
   function explainPrompt(t) {
@@ -731,10 +734,14 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
   /* ---------- Practice question bank ---------- */
   const PBOOKS = typeof PRACTICE_BOOKS !== "undefined" ? PRACTICE_BOOKS : [];
   const SECNAME = { P: "Problem", TE: "Theoretical Ex.", ST: "Self-Test" };
-  const GNAME = { 3: "🎯 GATE-likely", 2: "Good practice", 1: "Optional", 0: "Skip (proof)" };
+  const GNAME = { 3: "🎯 GATE-likely", 2: "Good practice" };
+  const STNAME = { s: "Done", h: "Done but hard", w: "Wrong" };
+  const statusBtns = k => { const s = S.practice[k]; return `<div class="btn-row" style="flex-wrap:nowrap">${[["s", "✓ Done", "good"], ["h", "Hard", "warn"], ["w", "✗ Wrong", "bad"]].map(([v, l, c]) => `<button class="btn sm ${s === v ? c : ""}" data-act="pq" data-k="${k}" data-v="${v}" title="${STNAME[v]}">${l}</button>`).join("")}</div>`; };
+  const qByKey = k => { const [bid] = k.split(":"); const b = PBOOKS.find(x => x.id === bid); const q = b && b.q.find(x => qKey(b, x) === k); return q ? { b, q } : null; };
+  const errorLog = () => Object.keys(S.practice).filter(k => (S.practice[k] === "h" || S.practice[k] === "w") && qByKey(k));
   const LNAME = { E: "Easy", M: "Medium", H: "Hard" };
   const qKey = (b, q) => b.id + ":" + q.c + q.s + q.n;
-  const qName = (b, q) => b.short + " Ch " + q.c + " · " + SECNAME[q.s] + " " + (q.c > 2 ? q.c + "." : "") + q.n;
+  const qName = (b, q) => b.short + " Ch " + q.c + " · " + SECNAME[q.s] + " " + (b.dotted && q.c > 2 ? q.c + "." : "") + q.n;
   function practiceCount(tid) { let n = 0; PBOOKS.forEach(b => b.q.forEach(q => { if (q.g >= 2 && b.patterns[q.k].tid === tid) n++; })); return n; }
   function pfilter(b, f) {
     return b.q.filter(q => (f.ch === "all" || String(q.c) === f.ch) && (f.sec === "all" || q.s === f.sec) && (f.lvl === "all" || q.l === f.lvl)
@@ -744,49 +751,71 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
   VIEWS.practice = () => {
     if (!PBOOKS.length) return `<div class="empty">No practice books loaded.</div>`;
     const f = S.ui.pf = { book: "ross", ch: "all", sec: "all", lvl: "all", g: "2", tid: "all", st: "todo", limit: 50, ...(S.ui.pf || {}) };
+    if (!["2", "3"].includes(String(f.g))) f.g = "2";
     const b = PBOOKS.find(x => x.id === f.book) || PBOOKS[0];
+    if (f.ch !== "all" && !b.chapters[f.ch]) f.ch = "all";
     const st = k => S.practice[k];
-    const tally = list => ({ n: list.length, s: list.filter(q => st(qKey(b, q)) === "s").length, w: list.filter(q => st(qKey(b, q)) === "w").length });
-    const tiers = [3, 2, 1].map(g => ({ g, ...tally(b.q.filter(q => q.g === g)) }));
-    const chRows = Object.keys(b.chapters).map(c => { const t = tally(b.q.filter(q => String(q.c) === c && q.g >= 2)); return `<div class="subj-row"><div>Ch ${c} <small>${esc(b.chapters[c])}</small></div>${bar(t.n ? (t.s + t.w) / t.n * 100 : 0, SUBJ[b.subj].color)}<div class="pct">${t.s + t.w}/${t.n}</div></div>`; }).join("");
+    const tally = list => ({ n: list.length, s: list.filter(q => st(qKey(b, q)) === "s").length, w: list.filter(q => ["w", "h"].includes(st(qKey(b, q)))).length });
+    const tiers = [3, 2].map(g => ({ g, ...tally(b.q.filter(q => q.g === g)) }));
+    const chRows = Object.keys(b.chapters).map(c => { const t = tally(b.q.filter(q => String(q.c) === c)); return `<div class="subj-row"><div>Ch ${c} <small>${esc(b.chapters[c])}</small></div>${bar(t.n ? (t.s + t.w) / t.n * 100 : 0, SUBJ[b.subj].color)}<div class="pct">${t.s + t.w}/${t.n}</div></div>`; }).join("");
     const list = pfilter(b, f), shown = list.slice(0, f.limit);
     const tids = [...new Set(b.q.map(q => b.patterns[q.k].tid))].filter(t => TOPIC[t]);
     const sel = (key, opts) => `<select data-ch="pf" data-k="${key}">${opts.map(([v, l]) => `<option value="${v}" ${String(f[key]) === String(v) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
     const link = (S.settings.pdf || {})[b.id];
     const rows = shown.map(q => {
       const k = qKey(b, q), s = st(k), pat = b.patterns[q.k];
-      return `<tr><td style="white-space:nowrap"><b>Ch ${q.c} · ${SECNAME[q.s]} ${q.c > 2 ? q.c + "." : ""}${q.n}</b>${q.x ? ` <span title="Starred as harder in the book">★</span>` : ""}</td>
+      return `<tr><td style="white-space:nowrap"><b>Ch ${q.c} · ${SECNAME[q.s]} ${b.dotted && q.c > 2 ? q.c + "." : ""}${q.n}</b>${q.x ? ` <span title="Starred as harder in the book">★</span>` : ""}</td>
         <td class="num" style="white-space:nowrap">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">p. ${q.p}</a>` : `p. ${q.p}`}</td>
         <td>${esc(q.t)}<br><small class="muted">PYQ pattern: ${esc(pat.label)}${TOPIC[pat.tid] ? " · " + esc(TOPIC[pat.tid].n.split("(")[0].split(":")[0].trim()) : ""}</small></td>
         <td><span class="tag ${q.l === "H" ? "H" : q.l === "M" ? "M" : "L"}">${LNAME[q.l]}</span></td>
         <td><span class="tag ${q.g === 3 ? "acc" : ""}">${GNAME[q.g]}</span></td>
         <td style="white-space:nowrap">${q.a ? `<small>Ans p. ${q.a}</small>` : ""}${q.o ? `<small>Solution p. ${q.o}</small>` : ""}${!q.a && !q.o ? `<small class="muted">—</small>` : ""}</td>
-        <td><div class="btn-row" style="flex-wrap:nowrap"><button class="btn sm ${s === "s" ? "good" : ""}" data-act="pq" data-k="${k}" data-v="s" aria-label="Solved">✓</button><button class="btn sm ${s === "w" ? "bad" : ""}" data-act="pq" data-k="${k}" data-v="w" aria-label="Wrong">✗</button></div></td></tr>`;
+        <td>${statusBtns(k)}</td></tr>`;
     }).join("");
-    return `<div class="page-head"><div><h1>Practice Questions</h1><p>Every exercise from your books, tagged by level, GATE relevance and PYQ pattern. Open the PDF at the page shown and solve it there, so the question, figures and numbers are exactly the book's. Mark ✓ solved or ✗ wrong; wrong ones go to Revision.</p></div></div>
+    const bookChips = PBOOKS.map(x => `<button class="chip ${x.id === b.id ? "active" : ""}" data-act="pfBook" data-b="${x.id}">${esc(x.short)} (${x.q.length})</button>`).join("");
+    return `<div class="page-head"><div><h1>Practice Questions</h1><p>Only GATE-relevant exercises from your books, tagged by level, GATE relevance and PYQ pattern. Solve each one in your PDF at the page shown, so the question, figures and numbers are exactly the book's. Mark it <b>Done</b>, <b>Hard</b> (done but tough) or <b>Wrong</b>. Hard and Wrong go to the <a href="#errorlog">Error Log</a>; Wrong also adds the topic to Revision.</p></div></div>
+      <div class="chips">${bookChips}</div>
       <div class="grid g2">
         <div class="card"><h2>${esc(b.title)}</h2>
-          <div class="grid g3" style="margin-top:6px">${tiers.map(t => `<div class="kpi"><div class="label">${GNAME[t.g]}</div><div class="value" style="font-size:1.5rem">${t.s + t.w}<small style="font-size:.9rem"> / ${t.n}</small></div><div class="hint">${t.w ? `<span style="color:var(--bad)">${t.w} wrong</span>` : "&nbsp;"}</div></div>`).join("")}</div>
+          <div class="grid g2" style="margin-top:6px">${tiers.map(t => `<div class="kpi"><div class="label">${GNAME[t.g]}</div><div class="value" style="font-size:1.5rem">${t.s + t.w}<small style="font-size:.9rem"> / ${t.n}</small></div><div class="hint">${t.w ? `<span style="color:var(--bad)">${t.w} in Error Log</span>` : "&nbsp;"}</div></div>`).join("")}</div>
           <p class="muted" style="margin-top:10px">${esc(b.notes)}</p>
           <label class="field" style="margin-top:8px"><span>Your PDF link (optional; page numbers open in your viewer)</span><input type="text" id="pdfLink" value="${esc(link || "")}" placeholder="Paste your Google Drive link"></label>
           <button class="btn sm" style="margin-top:6px" data-act="pdfSave" data-b="${b.id}">Save link</button></div>
-        <div class="card"><h2>Chapter progress <small>(🎯 + good practice)</small></h2>${chRows}</div>
+        <div class="card"><h2>Chapter progress</h2>${chRows}</div>
       </div>
       <div class="callout section-gap"><b>Order to solve:</b> first every 🎯 GATE-likely question of the chapter you just studied, then the Good-practice ones. Self-Test questions have full solutions at the back of the book (page shown), so use them to check your method. Page numbers are the PDF's "N of 848" footer.
-        <br><b>PYQ pattern</b> tells you which type of GATE question the problem trains. Exact year-by-year PYQ mapping will be added once you share the GATE DA 2024–2026 papers.</div>
+        <br><b>Asked in GATE?</b> The PYQ pattern shows which type of GATE question each problem trains. Which exact GATE question (year and number) matches a problem will be added once the GATE DA 2024–2026 papers are shared.</div>
       <div class="card section-gap">
         <div class="grid g4" style="align-items:end">
           <label class="field"><span>Chapter</span>${sel("ch", [["all", "All chapters"], ...Object.entries(b.chapters).map(([c, n]) => [c, "Ch " + c + " · " + n])])}</label>
-          <label class="field"><span>GATE relevance</span>${sel("g", [["3", "🎯 GATE-likely only"], ["2", "🎯 + Good practice"], ["1", "Everything except proofs"], ["all", "All, including proofs"]])}</label>
+          <label class="field"><span>GATE relevance</span>${sel("g", [["3", "🎯 GATE-likely only"], ["2", "🎯 + Good practice"]])}</label>
           <label class="field"><span>Syllabus topic</span>${sel("tid", [["all", "All topics"], ...tids.map(t => [t, TOPIC[t].n.split("(")[0].trim()])])}</label>
-          <label class="field"><span>Status</span>${sel("st", [["todo", "Not attempted"], ["w", "Wrong (redo)"], ["s", "Solved"], ["all", "All"]])}</label>
-          <label class="field"><span>Section</span>${sel("sec", [["all", "All sections"], ["P", "Problems"], ["ST", "Self-Test (with solutions)"], ["TE", "Theoretical Exercises"]])}</label>
+          <label class="field"><span>Status</span>${sel("st", [["todo", "Not attempted"], ["h", "Done but hard"], ["w", "Wrong"], ["s", "Done"], ["all", "All"]])}</label>
+          <label class="field"><span>Section</span>${sel("sec", [["all", "All sections"], ["P", "Problems"], ["ST", "Self-Test (with solutions)"], ["TE", "Theoretical Exercises"]].filter(([v]) => v === "all" || b.q.some(q => q.s === v)))}</label>
           <label class="field"><span>Level</span>${sel("lvl", [["all", "All levels"], ["E", "Easy"], ["M", "Medium"], ["H", "Hard"]])}</label>
         </div>
         <p class="muted" style="margin:12px 0 8px">${list.length} questions match · showing ${shown.length}</p>
-        ${shown.length ? `<div class="table-wrap"><table><thead><tr><th>Question</th><th class="num">PDF page</th><th>What it trains</th><th>Level</th><th>GATE</th><th>Check</th><th>Done</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">Nothing matches these filters.</div>`}
+        ${shown.length ? `<div class="table-wrap"><table><thead><tr><th>Question</th><th class="num">PDF page</th><th>What it trains</th><th>Level</th><th>GATE</th><th>Answer</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">Nothing matches these filters.</div>`}
         ${list.length > shown.length ? `<button class="btn" style="margin-top:10px" data-act="pfMore">Show 50 more</button>` : ""}
       </div>`;
+  };
+
+  VIEWS.errorlog = () => {
+    const keys = errorLog();
+    const rows = keys.map(k => { const { b, q } = qByKey(k); const pat = b.patterns[q.k]; const link = (S.settings.pdf || {})[b.id];
+      return `<tr><td style="white-space:nowrap"><b>${esc(b.short)}</b><br>Ch ${q.c} · ${SECNAME[q.s]} ${b.dotted && q.c > 2 ? q.c + "." : ""}${q.n}</td>
+        <td class="num">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">p. ${q.p}</a>` : `p. ${q.p}`}</td>
+        <td>${esc(q.t)}<br><small class="muted">${esc(pat.label)}</small></td>
+        <td><span class="tag ${S.practice[k] === "w" ? "H" : "M"}">${STNAME[S.practice[k]]}</span></td>
+        <td style="white-space:nowrap">${q.a ? `<small>Ans p. ${q.a}</small>` : ""}${q.o ? `<small>Solution p. ${q.o}</small>` : ""}</td>
+        <td>${statusBtns(k)}</td></tr>`; }).join("");
+    const nW = keys.filter(k => S.practice[k] === "w").length;
+    return `<div class="page-head"><div><h1>Error Log</h1><p>Every practice question you marked <b>Hard</b> or <b>Wrong</b>. Re-solve them without looking at the answer. Once you can do one cleanly, mark it <b>Done</b> and it leaves the log.</p></div></div>
+      <div class="grid g3"><div class="card kpi"><div class="label">In the log</div><div class="value">${keys.length}</div></div>
+        <div class="card kpi"><div class="label">Wrong</div><div class="value" style="color:var(--bad)">${nW}</div></div>
+        <div class="card kpi"><div class="label">Done but hard</div><div class="value" style="color:var(--warn)">${keys.length - nW}</div></div></div>
+      <div class="card section-gap">${keys.length ? `<div class="table-wrap"><table><thead><tr><th>Question</th><th class="num">PDF page</th><th>What it trains</th><th>Why here</th><th>Answer</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">Empty. Questions you mark Hard or Wrong on the Practice page appear here.</div>`}</div>
+      <div class="callout section-gap"><b>How to use it:</b> go through the log every Sunday. For each question, first write down in one line why you got it wrong (the concept, a formula, or a silly slip), then re-solve it. Put that line in Short Notes if it is a trap you might repeat.</div>`;
   };
 
   VIEWS.books = () => {
@@ -900,12 +929,15 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     pq: el => {
       const k = el.dataset.k, v = el.dataset.v; const cur = S.practice[k];
       if (cur === v) delete S.practice[k]; else S.practice[k] = v;
+      if (S.practice[k] === "h" && cur !== "h") toast("Saved to the Error Log.");
+      if (S.practice[k] === "s" && (cur === "h" || cur === "w")) toast("Done. Removed from the Error Log.");
       if (v === "w" && cur !== "w") {
         const [bid, ref] = k.split(":"); const b = PBOOKS.find(x => x.id === bid); const q = b && b.q.find(x => qKey(b, x) === k);
-        if (q && TOPIC[b.patterns[q.k].tid]) { addRev(b.patterns[q.k].tid, "Wrong: " + qName(b, q)); toast("Marked wrong. Topic added to Revision."); }
+        if (q && TOPIC[b.patterns[q.k].tid]) { addRev(b.patterns[q.k].tid, "Wrong: " + qName(b, q)); toast("Saved to the Error Log. Topic added to Revision."); }
       }
       save(); render();
     },
+    pfBook: el => { S.ui.pf = { ...S.ui.pf, book: el.dataset.b, ch: "all", tid: "all", limit: 50 }; save(); render(); },
     pfMore: () => { S.ui.pf.limit += 50; save(); render(); },
     pdfSave: el => { S.settings.pdf = { ...(S.settings.pdf || {}), [el.dataset.b]: $("#pdfLink").value.trim() }; save(); toast("PDF link saved."); render(); },
     practiceTopic: el => { S.ui.pf = { ...(S.ui.pf || {}), tid: el.dataset.t, st: "todo", g: "2", ch: "all", sec: "all", lvl: "all", limit: 50 }; save(); go("practice"); },
