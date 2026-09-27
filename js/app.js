@@ -31,9 +31,9 @@
   /* ================= state ================= */
   const KEY = "gateda27_tracker_v1";
   const DEFAULT = () => ({
-    v: 1, items: {}, topics: {}, rev: {}, pomo: [], mocks: [], notes: [], daysDone: {}, mockPlanDone: {},
-    ui: { subj: "la", noteSubj: "la", open: {}, mockOpen: false },
-    settings: { gate: "2027-02-06", slot: "morning", focus: 25, short: 5, long: 15, target: 18, theme: "auto" }
+    v: 1, items: {}, topics: {}, rev: {}, pomo: [], mocks: [], notes: [], daysDone: {}, mockPlanDone: {}, practice: {},
+    ui: { subj: "la", noteSubj: "la", open: {}, mockOpen: false, pf: { book: "ross", ch: "all", sec: "all", lvl: "all", g: "2", tid: "all", st: "todo", limit: 50 } },
+    settings: { gate: "2027-02-06", slot: "morning", focus: 25, short: 5, long: 15, target: 18, theme: "auto", pdf: {} }
   });
   let S;
   function load() {
@@ -47,7 +47,7 @@
 
   /* ---- cloud sync (claude.ai artifact database); plain browsers keep localStorage only ---- */
   const IN_ART = !!(window.claude && typeof window.claude.use === "function");
-  const PARTS = { core: ["items", "topics", "rev", "daysDone", "mockPlanDone", "ui", "settings"], pomo: ["pomo"], notes: ["notes"], mocks: ["mocks"] };
+  const PARTS = { core: ["items", "topics", "rev", "daysDone", "mockPlanDone", "ui", "settings"], pomo: ["pomo"], notes: ["notes"], mocks: ["mocks"], practice: ["practice"] };
   let DB = null, pushTimer = null, pushing = false, pushAgain = false; const lastPushed = {};
   const partData = k => { const o = {}; PARTS[k].forEach(f => o[f] = S[f]); return o; };
   function schedulePush() { if (!DB) return; clearTimeout(pushTimer); pushTimer = setTimeout(pushDb, 1500); }
@@ -460,6 +460,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
           <button class="btn sm" data-act="copyExplain" data-t="${t.id}">📋 Claude explainer prompt</button>
           <button class="btn sm" data-act="copyPyq" data-t="${t.id}">📋 Claude practice-set prompt</button>
           <button class="btn sm" data-act="noteFor" data-t="${t.id}">📝 Add short note</button>
+          ${practiceCount(t.id) ? `<button class="btn sm" data-act="practiceTopic" data-t="${t.id}">✍️ Book questions (${practiceCount(t.id)})</button>` : ""}
         </div>
       </div></details>`;
   }
@@ -727,6 +728,67 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
   };
 
   /* ---------- Books ---------- */
+  /* ---------- Practice question bank ---------- */
+  const PBOOKS = typeof PRACTICE_BOOKS !== "undefined" ? PRACTICE_BOOKS : [];
+  const SECNAME = { P: "Problem", TE: "Theoretical Ex.", ST: "Self-Test" };
+  const GNAME = { 3: "🎯 GATE-likely", 2: "Good practice", 1: "Optional", 0: "Skip (proof)" };
+  const LNAME = { E: "Easy", M: "Medium", H: "Hard" };
+  const qKey = (b, q) => b.id + ":" + q.c + q.s + q.n;
+  const qName = (b, q) => b.short + " Ch " + q.c + " · " + SECNAME[q.s] + " " + (q.c > 2 ? q.c + "." : "") + q.n;
+  function practiceCount(tid) { let n = 0; PBOOKS.forEach(b => b.q.forEach(q => { if (q.g >= 2 && b.patterns[q.k].tid === tid) n++; })); return n; }
+  function pfilter(b, f) {
+    return b.q.filter(q => (f.ch === "all" || String(q.c) === f.ch) && (f.sec === "all" || q.s === f.sec) && (f.lvl === "all" || q.l === f.lvl)
+      && (f.g === "all" || q.g >= +f.g && (f.g !== "0" || true)) && (f.tid === "all" || b.patterns[q.k].tid === f.tid)
+      && (f.st === "all" || (f.st === "todo" ? !S.practice[qKey(b, q)] : S.practice[qKey(b, q)] === f.st)));
+  }
+  VIEWS.practice = () => {
+    if (!PBOOKS.length) return `<div class="empty">No practice books loaded.</div>`;
+    const f = S.ui.pf = { book: "ross", ch: "all", sec: "all", lvl: "all", g: "2", tid: "all", st: "todo", limit: 50, ...(S.ui.pf || {}) };
+    const b = PBOOKS.find(x => x.id === f.book) || PBOOKS[0];
+    const st = k => S.practice[k];
+    const tally = list => ({ n: list.length, s: list.filter(q => st(qKey(b, q)) === "s").length, w: list.filter(q => st(qKey(b, q)) === "w").length });
+    const tiers = [3, 2, 1].map(g => ({ g, ...tally(b.q.filter(q => q.g === g)) }));
+    const chRows = Object.keys(b.chapters).map(c => { const t = tally(b.q.filter(q => String(q.c) === c && q.g >= 2)); return `<div class="subj-row"><div>Ch ${c} <small>${esc(b.chapters[c])}</small></div>${bar(t.n ? (t.s + t.w) / t.n * 100 : 0, SUBJ[b.subj].color)}<div class="pct">${t.s + t.w}/${t.n}</div></div>`; }).join("");
+    const list = pfilter(b, f), shown = list.slice(0, f.limit);
+    const tids = [...new Set(b.q.map(q => b.patterns[q.k].tid))].filter(t => TOPIC[t]);
+    const sel = (key, opts) => `<select data-ch="pf" data-k="${key}">${opts.map(([v, l]) => `<option value="${v}" ${String(f[key]) === String(v) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+    const link = (S.settings.pdf || {})[b.id];
+    const rows = shown.map(q => {
+      const k = qKey(b, q), s = st(k), pat = b.patterns[q.k];
+      return `<tr><td style="white-space:nowrap"><b>Ch ${q.c} · ${SECNAME[q.s]} ${q.c > 2 ? q.c + "." : ""}${q.n}</b>${q.x ? ` <span title="Starred as harder in the book">★</span>` : ""}</td>
+        <td class="num" style="white-space:nowrap">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">p. ${q.p}</a>` : `p. ${q.p}`}</td>
+        <td>${esc(q.t)}<br><small class="muted">PYQ pattern: ${esc(pat.label)}${TOPIC[pat.tid] ? " · " + esc(TOPIC[pat.tid].n.split("(")[0].split(":")[0].trim()) : ""}</small></td>
+        <td><span class="tag ${q.l === "H" ? "H" : q.l === "M" ? "M" : "L"}">${LNAME[q.l]}</span></td>
+        <td><span class="tag ${q.g === 3 ? "acc" : ""}">${GNAME[q.g]}</span></td>
+        <td style="white-space:nowrap">${q.a ? `<small>Ans p. ${q.a}</small>` : ""}${q.o ? `<small>Solution p. ${q.o}</small>` : ""}${!q.a && !q.o ? `<small class="muted">—</small>` : ""}</td>
+        <td><div class="btn-row" style="flex-wrap:nowrap"><button class="btn sm ${s === "s" ? "good" : ""}" data-act="pq" data-k="${k}" data-v="s" aria-label="Solved">✓</button><button class="btn sm ${s === "w" ? "bad" : ""}" data-act="pq" data-k="${k}" data-v="w" aria-label="Wrong">✗</button></div></td></tr>`;
+    }).join("");
+    return `<div class="page-head"><div><h1>Practice Questions</h1><p>Every exercise from your books, tagged by level, GATE relevance and PYQ pattern. Open the PDF at the page shown and solve it there, so the question, figures and numbers are exactly the book's. Mark ✓ solved or ✗ wrong; wrong ones go to Revision.</p></div></div>
+      <div class="grid g2">
+        <div class="card"><h2>${esc(b.title)}</h2>
+          <div class="grid g3" style="margin-top:6px">${tiers.map(t => `<div class="kpi"><div class="label">${GNAME[t.g]}</div><div class="value" style="font-size:1.5rem">${t.s + t.w}<small style="font-size:.9rem"> / ${t.n}</small></div><div class="hint">${t.w ? `<span style="color:var(--bad)">${t.w} wrong</span>` : "&nbsp;"}</div></div>`).join("")}</div>
+          <p class="muted" style="margin-top:10px">${esc(b.notes)}</p>
+          <label class="field" style="margin-top:8px"><span>Your PDF link (optional; page numbers open in your viewer)</span><input type="text" id="pdfLink" value="${esc(link || "")}" placeholder="Paste your Google Drive link"></label>
+          <button class="btn sm" style="margin-top:6px" data-act="pdfSave" data-b="${b.id}">Save link</button></div>
+        <div class="card"><h2>Chapter progress <small>(🎯 + good practice)</small></h2>${chRows}</div>
+      </div>
+      <div class="callout section-gap"><b>Order to solve:</b> first every 🎯 GATE-likely question of the chapter you just studied, then the Good-practice ones. Self-Test questions have full solutions at the back of the book (page shown), so use them to check your method. Page numbers are the PDF's "N of 848" footer.
+        <br><b>PYQ pattern</b> tells you which type of GATE question the problem trains. Exact year-by-year PYQ mapping will be added once you share the GATE DA 2024–2026 papers.</div>
+      <div class="card section-gap">
+        <div class="grid g4" style="align-items:end">
+          <label class="field"><span>Chapter</span>${sel("ch", [["all", "All chapters"], ...Object.entries(b.chapters).map(([c, n]) => [c, "Ch " + c + " · " + n])])}</label>
+          <label class="field"><span>GATE relevance</span>${sel("g", [["3", "🎯 GATE-likely only"], ["2", "🎯 + Good practice"], ["1", "Everything except proofs"], ["all", "All, including proofs"]])}</label>
+          <label class="field"><span>Syllabus topic</span>${sel("tid", [["all", "All topics"], ...tids.map(t => [t, TOPIC[t].n.split("(")[0].trim()])])}</label>
+          <label class="field"><span>Status</span>${sel("st", [["todo", "Not attempted"], ["w", "Wrong (redo)"], ["s", "Solved"], ["all", "All"]])}</label>
+          <label class="field"><span>Section</span>${sel("sec", [["all", "All sections"], ["P", "Problems"], ["ST", "Self-Test (with solutions)"], ["TE", "Theoretical Exercises"]])}</label>
+          <label class="field"><span>Level</span>${sel("lvl", [["all", "All levels"], ["E", "Easy"], ["M", "Medium"], ["H", "Hard"]])}</label>
+        </div>
+        <p class="muted" style="margin:12px 0 8px">${list.length} questions match · showing ${shown.length}</p>
+        ${shown.length ? `<div class="table-wrap"><table><thead><tr><th>Question</th><th class="num">PDF page</th><th>What it trains</th><th>Level</th><th>GATE</th><th>Check</th><th>Done</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">Nothing matches these filters.</div>`}
+        ${list.length > shown.length ? `<button class="btn" style="margin-top:10px" data-act="pfMore">Show 50 more</button>` : ""}
+      </div>`;
+  };
+
   VIEWS.books = () => {
     const totals = SUBJECTS.map(s => { const n = sum(s.topics.flatMap(t => t.p.map(p => parseInt(p[1], 10) || 0))); return [s, n]; });
     return `<div class="page-head"><div><h1>Books &amp; Practice Sources</h1><p>For every topic: one book to <b>study</b> from, one or two to <b>practise</b> from, and a question target. The exact chapter for each topic is on its card in the Syllabus Tracker.</p></div></div>
@@ -835,6 +897,18 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     rAdd: () => { addRev($("#revAdd").value, "Added manually"); save(); render(); },
     rRoutine: el => { ts(el.dataset.t).revs++; save(); render(); },
     scrollToday: () => { const r = document.getElementById("d-" + today()); if (r) r.scrollIntoView({ block: "center", behavior: "smooth" }); else toast("Today is outside the syllabus phase."); },
+    pq: el => {
+      const k = el.dataset.k, v = el.dataset.v; const cur = S.practice[k];
+      if (cur === v) delete S.practice[k]; else S.practice[k] = v;
+      if (v === "w" && cur !== "w") {
+        const [bid, ref] = k.split(":"); const b = PBOOKS.find(x => x.id === bid); const q = b && b.q.find(x => qKey(b, x) === k);
+        if (q && TOPIC[b.patterns[q.k].tid]) { addRev(b.patterns[q.k].tid, "Wrong: " + qName(b, q)); toast("Marked wrong. Topic added to Revision."); }
+      }
+      save(); render();
+    },
+    pfMore: () => { S.ui.pf.limit += 50; save(); render(); },
+    pdfSave: el => { S.settings.pdf = { ...(S.settings.pdf || {}), [el.dataset.b]: $("#pdfLink").value.trim() }; save(); toast("PDF link saved."); render(); },
+    practiceTopic: el => { S.ui.pf = { ...(S.ui.pf || {}), tid: el.dataset.t, st: "todo", g: "2", ch: "all", sec: "all", lvl: "all", limit: 50 }; save(); go("practice"); },
     mockToggle: () => { S.ui.mockOpen = !S.ui.mockOpen; draftMistakes = []; save(); render(); },
     mxAdd: () => { draftMistakes.push({ tid: $("#mx_t").value, type: $("#mx_type").value, note: $("#mx_note").value.trim() }); $("#mx_note").value = ""; paintMistakes(); },
     mxDel: el => { draftMistakes.splice(+el.dataset.i, 1); paintMistakes(); },
@@ -862,6 +936,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     dayDone: el => { S.daysDone[el.dataset.d] = el.checked; save(); },
     mockPlan: el => { S.mockPlanDone[el.dataset.d] = el.checked; save(); },
     pTopic: el => { P.tid = el.value; },
+    pf: el => { S.ui.pf[el.dataset.k] = el.value; S.ui.pf.limit = 50; save(); render(); },
     claudeT: el => { S.ui.claudeT = el.value; save(); render(); },
     set: el => { const k = el.dataset.k; S.settings[k] = el.type === "number" ? Math.max(1, +el.value || 1) : el.value; save(); if (k === "theme") applyTheme(); if (!P.running) P.left = null; toast("Saved."); },
     import: el => {

@@ -24,7 +24,7 @@ const SUBJECTS = [
   id: "ps", name: "Probability & Statistics", short: "P&S", color: "#e8590c", marks: "16–22",
   why: "Most important maths subject. It also feeds ML (Naive Bayes, LDA, regression) and AI (Bayes nets), so learning it well pays off three times.",
   books: [
-    ["Sheldon Ross — A First Course in Probability (8th/9th ed)", "Main book for probability. Its chapters follow the GATE syllabus order."],
+    ["Sheldon Ross — A First Course in Probability (10th ed)", "Main book for probability. Its chapters follow the GATE syllabus order."],
     ["Sheldon Ross — Introduction to Probability and Statistics for Engineers and Scientists", "Confidence intervals, z/t/chi-square tests, CLT. Close to GATE DA style."],
     ["Blitzstein & Hwang — Introduction to Probability (free PDF, Harvard Stat 110)", "Best intuition book. The Stat 110 YouTube lectures are good if you are weak in maths."],
     ["Montgomery & Runger — Applied Statistics and Probability for Engineers", "Extra hypothesis-testing numericals."],
