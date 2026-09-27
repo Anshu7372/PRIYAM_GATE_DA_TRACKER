@@ -1,6 +1,10 @@
 # GATE DA 2027 — Rank-1 Tracker
 
-A static website (no build, no server) for preparing for GATE DA 2027. Open `index.html` in a browser, or host it free with GitHub Pages (Settings → Pages → Deploy from branch → root).
+A static website (no build, no server) for preparing for GATE DA 2027.
+
+**Live site (after enabling GitHub Pages):** https://anshu7372.github.io/PRIYAM_GATE_DA_TRACKER/
+
+To enable it: repo **Settings → Pages → Source: Deploy from a branch → Branch: `claude/jolly-goodall-4cooem`, folder `/ (root)` → Save**. The site goes live in 1–2 minutes.
 
 ## What's inside
 | Page | What it does |

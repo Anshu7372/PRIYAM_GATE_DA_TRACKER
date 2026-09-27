@@ -43,7 +43,41 @@
     } catch (e) { /* storage unavailable */ }
     return DEFAULT();
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } schedulePush(); }
+
+  /* ---- cloud sync (claude.ai artifact database); plain browsers keep localStorage only ---- */
+  const IN_ART = !!(window.claude && typeof window.claude.use === "function");
+  const PARTS = { core: ["items", "topics", "rev", "daysDone", "mockPlanDone", "ui", "settings"], pomo: ["pomo"], notes: ["notes"], mocks: ["mocks"] };
+  let DB = null, pushTimer = null, pushing = false, pushAgain = false; const lastPushed = {};
+  const partData = k => { const o = {}; PARTS[k].forEach(f => o[f] = S[f]); return o; };
+  function schedulePush() { if (!DB) return; clearTimeout(pushTimer); pushTimer = setTimeout(pushDb, 1500); }
+  async function pushDb() {
+    if (!DB) return; if (pushing) { pushAgain = true; return; }
+    pushing = true;
+    try {
+      for (const k of Object.keys(PARTS)) {
+        const json = JSON.stringify(partData(k));
+        if (json !== lastPushed[k]) { await DB.doc("tracker/" + k).set(JSON.parse(json)); lastPushed[k] = json; }
+      }
+    } catch (e) { toast("Cloud save failed (" + (e && e.code || "error") + "). Saved in this browser; it will retry on your next change."); }
+    pushing = false; if (pushAgain) { pushAgain = false; pushDb(); }
+  }
+  async function initDb() {
+    if (!IN_ART) return;
+    let db = null; try { db = await window.claude.use("db"); } catch (e) { db = null; }
+    if (!db) return;
+    try {
+      let found = false; const snaps = {};
+      for (const k of Object.keys(PARTS)) { const sn = await db.doc("tracker/" + k).get(); snaps[k] = sn; if (sn.exists) found = true; }
+      DB = db;
+      if (found) {
+        Object.keys(PARTS).forEach(k => { const sn = snaps[k]; if (sn.exists) { const d = sn.data() || {}; PARTS[k].forEach(f => { if (d[f] !== undefined) S[f] = d[f]; }); lastPushed[k] = JSON.stringify(partData(k)); } });
+        const def = DEFAULT(); S.ui = { ...def.ui, ...(S.ui || {}) }; S.settings = { ...def.settings, ...(S.settings || {}) };
+        try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
+        applyTheme(); render();
+      } else pushDb();
+    } catch (e) { DB = db; }
+  }
   S = load();
 
   function toast(msg) {
@@ -236,7 +270,13 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
       ta.remove();
     }
   }
-  function download(name, text, type = "text/plain") {
+  async function download(name, text, type = "text/plain") {
+    if (IN_ART) {
+      let dl = null; try { dl = await window.claude.use("downloads"); } catch (e) { dl = null; }
+      if (!dl) { copy(text); return; }
+      try { await dl.save({ filename: name, data: new Blob([text], { type }) }); } catch (e) { toast("Download cancelled."); }
+      return;
+    }
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
@@ -679,7 +719,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
         <details ${mine.length ? "" : "open"}><summary class="muted" style="cursor:pointer">Must remember (${t.m.length})</summary><ul style="margin:6px 0 0">${t.m.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details></div>`;
     }).join("");
     return `<div class="page-head"><div><h1>Short Notes</h1><p>Add notes while you study: only mistakes, traps and must-remember points. At the end of each subject this page becomes your one-stop revision sheet. You can print it or download it.</p></div>
-      <div class="btn-row no-print"><button class="btn" data-act="notesMd">⬇ Download .md</button><button class="btn" data-act="print">🖨 Print</button><button class="btn" data-act="notesPrompt">📋 Claude short-notes prompt</button></div></div>
+      <div class="btn-row no-print"><button class="btn" data-act="notesMd">⬇ Download .md</button>${IN_ART ? "" : `<button class="btn" data-act="print">🖨 Print</button>`}<button class="btn" data-act="notesPrompt">📋 Claude short-notes prompt</button></div></div>
       <div class="chips no-print">${chips}</div>
       ${done >= 90 ? `<div class="callout good no-print" style="margin-bottom:14px">${esc(s.name)} is ${done}% complete. Generate the final short notes: click “Claude short-notes prompt”, paste it into Claude and save the result.</div>` : ""}
       <div class="card no-print" style="margin-bottom:14px"><h2>Add a note</h2>${noteForm(s.topics[0].id)}</div>
@@ -804,10 +844,10 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
       draftMistakes = []; S.ui.mockOpen = false; save();
       toast("Mock saved." + (m.mistakes.length ? " " + m.mistakes.length + (m.mistakes.length === 1 ? " topic" : " topics") + " sent to Revision." : "")); render();
     },
-    mockDel: el => { if (confirm("Delete this mock?")) { S.mocks = S.mocks.filter(m => m.id !== el.dataset.id); save(); render(); } },
+    mockDel: el => { if (armed(el, "Click again to delete")) { S.mocks = S.mocks.filter(m => m.id !== el.dataset.id); save(); render(); } },
     mockPrompt: el => copy(mockPrompt(S.mocks.find(m => m.id === el.dataset.id))),
     export: () => download("gate-da-tracker-backup-" + today() + ".json", JSON.stringify(S, null, 1), "application/json"),
-    reset: () => { if (confirm("Erase ALL progress, notes, pomodoros and mocks? Export a backup first.")) { S = DEFAULT(); save(); applyTheme(); render(); } }
+    reset: el => { if (armed(el, "Click again to erase everything")) { S = DEFAULT(); save(); applyTheme(); render(); } }
   };
   const CH = {
     item: el => { S.items[el.dataset.id] = el.checked; if (!el.checked) delete S.items[el.dataset.id]; const t = TOPIC[el.dataset.id.split(":")[0]]; refreshDone(t); save(); render(); },
@@ -827,6 +867,12 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
       r.readAsText(f);
     }
   };
+  function armed(el, msg) {
+    if (el.dataset.armed === "1") return true;
+    el.dataset.armed = "1"; const old = el.textContent; el.textContent = msg;
+    setTimeout(() => { el.dataset.armed = ""; el.textContent = old; }, 4000);
+    return false;
+  }
   function checkAcc(id) { const st = ts(id); if (st.att >= 5 && st.cor / st.att < 0.6) { addRev(id, "PYQ accuracy " + Math.round(st.cor / st.att * 100) + "%"); toast("PYQ accuracy below 60%: added to Revision."); } }
 
   document.addEventListener("click", e => {
@@ -841,4 +887,5 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
 
   applyTheme();
   render();
+  initDb();
 })();
