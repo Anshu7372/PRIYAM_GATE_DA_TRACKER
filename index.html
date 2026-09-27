@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GATE DA 2027 Tracker</title>
+<meta name="description" content="Full GATE DA syllabus tree, PYQ mapping, books, day-by-day plan, Pomodoro, revision queue, mock analysis and short notes.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-mark">DA</div>
+      <div>
+        <div class="brand-title">GATE DA 2027</div>
+        <div class="brand-sub">Rank-1 Tracker</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#dashboard" data-v="dashboard">Dashboard</a>
+      <a href="#today" data-v="today">Today</a>
+      <a href="#syllabus" data-v="syllabus">Syllabus Tracker</a>
+      <a href="#pyqmap" data-v="pyqmap">PYQ Map</a>
+      <a href="#schedule" data-v="schedule">Schedule</a>
+      <a href="#pomodoro" data-v="pomodoro">Pomodoro</a>
+      <a href="#revision" data-v="revision">Revision <span class="nav-badge" id="revBadge"></span></a>
+      <a href="#mocks" data-v="mocks">Mocks &amp; Analysis</a>
+      <a href="#notes" data-v="notes">Short Notes</a>
+      <a href="#books" data-v="books">Books &amp; Practice</a>
+      <a href="#claude" data-v="claude">Study with Claude</a>
+      <a href="#settings" data-v="settings">Settings &amp; Backup</a>
+    </nav>
+    <div class="mini-timer" id="miniTimer" hidden>
+      <span id="miniMode">Focus</span>
+      <strong id="miniTime">25:00</strong>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
