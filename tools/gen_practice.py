@@ -1,7 +1,7 @@
 import json,sys
 B=sys.argv[1]; out_path=sys.argv[2]
-d=json.load(open(B+'/practice_v2.json')); s3=json.load(open(B+'/strang_practice.json'))
-pat=dict(d['pat']); pat.update(s3['pat'])
+d=json.load(open(B+'/practice_v2.json')); s3=json.load(open(B+'/strang_practice.json')); s5=json.load(open(B+'/thomas_practice.json'))
+pat=dict(d['pat']); pat.update(s3['pat']); pat.update(s5['pat'])
 rows=lambda qs: ",\n".join('      '+json.dumps(q,ensure_ascii=False,separators=(',',':')) for q in qs)
 books=[
  dict(id="ross", dotted=True, title="Sheldon Ross — A First Course in Probability (10th ed)", short="Ross · First Course in Probability", subj="ps",
@@ -13,6 +13,9 @@ books=[
  dict(id="strang", sets=True, title="Gilbert Strang — Introduction to Linear Algebra (5th ed)", short="Strang · Linear Algebra", subj="la",
       chapters={1:"Introduction to Vectors",2:"Solving Linear Equations",3:"Vector Spaces and Subspaces",4:"Orthogonality",5:"Determinants",6:"Eigenvalues and Eigenvectors",7:"SVD and PCA",12:"Linear Algebra in Probability & Statistics"},
       notes="Only GATE-relevant problems are listed. Skipped: 6.3 (differential equations), Ch 8–11 (linear transformations, complex matrices, applications, numerical methods), 12.3. This PDF has no answer section; check with the Worked Examples in each section or the MIT 18.06 solutions.", q=s3['q']),
+ dict(id="thomas", sets=True, setWord="Exercises", title="Thomas' Calculus: Early Transcendentals (13th ed)", short="Thomas · Calculus", subj="co",
+      chapters={1:"Functions",2:"Limits and Continuity",3:"Derivatives",4:"Applications of Derivatives",5:"Integrals",8:"Techniques of Integration (parts, improper, probability)",10:"Sequences and Series (Taylor series)"},
+      notes="Only GATE-relevant exercises are listed. In long drill groups (plain derivative/integral calculations) only every fourth exercise is listed; concept groups are complete. Answers to odd-numbered exercises are at the back of the book (page shown). Skipped: Ch 6, 7, 9, 11–16.", q=s5['q']),
 ]
 js="""/* Practice question bank: GATE-relevant exercises only, as references (chapter/section, number, PDF page) plus tags.
    Question text stays in the book; open your own PDF at the page shown.

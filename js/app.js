@@ -776,7 +776,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
       q: PYQS.map(q => ({ c: q.y, s: "Q", n: q.n, p: q.p, l: q.l, g: 3, k: "T:" + q.tid, pk: q.k, t: q.t, m: q.m, ty: q.ty })) });
   }
   const SECNAME = { P: "Problem", TE: "Theoretical Ex.", ST: "Self-Test", Q: "Q." };
-  const qLabel = (b, q) => b.pyq ? `GATE ${q.c} · Q.${q.n}` : b.sets ? `Problem Set ${q.sec} · Q.${q.n}` : `Ch ${q.c} · ${SECNAME[q.s]} ${b.dotted && q.c > 2 ? q.c + "." : ""}${q.n}`;
+  const qLabel = (b, q) => b.pyq ? `GATE ${q.c} · Q.${q.n}` : b.sets ? `${b.setWord || "Problem Set"} ${q.sec} · Q.${q.n}` : `Ch ${q.c} · ${SECNAME[q.s]} ${b.dotted && q.c > 2 ? q.c + "." : ""}${q.n}`;
   const askedLine = (b, q) => { if (b.pyq) return `<span class="tag">${q.m} mark${q.m > 1 ? "s" : ""} · ${q.ty}</span>`; const l = PYQ_BY_K[q.k]; return l ? `<span style="color:var(--good)">✔ Same type asked in GATE DA: ${esc(pyqRefs(l))}</span>` : `<span class="muted">Same type not asked in GATE DA 2024–26</span>`; };
   const GNAME = { 3: "🎯 GATE-likely", 2: "Good practice" };
   const STNAME = { s: "Done", h: "Done but hard", w: "Wrong" };
