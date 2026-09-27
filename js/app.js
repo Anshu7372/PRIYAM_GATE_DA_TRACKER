@@ -771,7 +771,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     const pats = { ...(PBOOKS[0] ? PBOOKS[0].patterns : {}) };
     PYQS.forEach(q => { pats["T:" + q.tid] = { tid: q.tid, label: TOPIC[q.tid] ? TOPIC[q.tid].n.split("(")[0].split(":")[0].trim() : q.tid }; });
     const ch = {}; Object.entries(PYQ.papers).forEach(([y, v]) => ch[y] = "GATE DA " + y + " · " + v.inst);
-    PBOOKS.unshift({ id: "pyq", pyq: true, title: "GATE DA previous-year papers (2024–2026)", short: "GATE PYQ", subj: "ps", chapters: ch, patterns: pats,
+    PBOOKS.unshift({ id: "pyq", pyq: true, title: "GATE DA previous-year papers (2024–2026)", short: "GATE DA PYQs 2024–26", subj: "ps", chapters: ch, patterns: pats,
       notes: "These are the actual GATE DA papers. Solve each question in that year's paper PDF at the page shown, ideally timed. Answer keys are not in these PDFs, so check with the official GATE answer key. Level is our judgement.",
       q: PYQS.map(q => ({ c: q.y, s: "Q", n: q.n, p: q.p, l: q.l, g: 3, k: "T:" + q.tid, pk: q.k, t: q.t, m: q.m, ty: q.ty })) });
   }
@@ -809,15 +809,15 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     const link = (S.settings.pdf || {})[b.id];
     const rows = shown.map(q => {
       const k = qKey(b, q), s = st(k), pat = b.patterns[q.k];
-      return `<tr><td style="white-space:nowrap"><b>${qLabel(b, q)}</b>${q.x ? ` <span title="Starred as harder in the book">★</span>` : ""}</td>
+      return `<tr><td style="white-space:nowrap"><small class="muted">${esc(b.short)}</small><br><b>${qLabel(b, q)}</b>${q.x ? ` <span title="Starred as harder in the book">★</span>` : ""}</td>
         <td class="num" style="white-space:nowrap">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">p. ${q.p}</a>` : `p. ${q.p}`}</td>
-        <td>${esc(q.t)}<br><small class="muted">${b.pyq ? "Topic" : "PYQ pattern"}: ${esc(pat.label)}${!b.pyq && TOPIC[pat.tid] ? " · " + esc(TOPIC[pat.tid].n.split("(")[0].split(":")[0].trim()) : ""}</small><br><small>${askedLine(b, q)}</small></td>
+        <td style="min-width:240px">${esc(q.t)}<br><small class="muted">${b.pyq ? "Topic" : "PYQ pattern"}: ${esc(pat.label)}${!b.pyq && TOPIC[pat.tid] ? " · " + esc(TOPIC[pat.tid].n.split("(")[0].split(":")[0].trim()) : ""}</small><br><small>${askedLine(b, q)}</small></td>
         <td><span class="tag ${q.l === "H" ? "H" : q.l === "M" ? "M" : "L"}">${LNAME[q.l]}</span></td>
         <td><span class="tag ${q.g === 3 ? "acc" : ""}">${b.pyq ? "📄 Actual PYQ" : GNAME[q.g]}</span></td>
         <td style="white-space:nowrap">${q.a ? `<small>Ans p. ${q.a}</small>` : ""}${q.o ? `<small>Solution p. ${q.o}</small>` : ""}${!q.a && !q.o ? `<small class="muted">—</small>` : ""}</td>
         <td>${statusBtns(k)}</td></tr>`;
     }).join("");
-    const bookChips = PBOOKS.map(x => `<button class="chip ${x.id === b.id ? "active" : ""}" data-act="pfBook" data-b="${x.id}">${x.pyq ? "📄 " : ""}${esc(x.short)} (${x.q.length})</button>`).join("");
+    const bookChips = `<span class="muted" style="align-self:center;margin-right:4px">Choose a book:</span>` + PBOOKS.map(x => `<button class="chip ${x.id === b.id ? "active" : ""}" data-act="pfBook" data-b="${x.id}">${x.pyq ? "📄 " : "📘 "}${esc(x.short)} (${x.q.length})</button>`).join("");
     return `<div class="page-head"><div><h1>Practice Questions</h1><p>Only GATE-relevant exercises from your books, tagged by level, GATE relevance and PYQ pattern. Solve each one in your PDF at the page shown, so the question, figures and numbers are exactly the book's. Mark it <b>Done</b>, <b>Hard</b> (done but tough) or <b>Wrong</b>. Hard and Wrong go to the <a href="#errorlog">Error Log</a>; Wrong also adds the topic to Revision.</p></div></div>
       <div class="chips">${bookChips}</div>
       <div class="grid g2">
@@ -828,9 +828,10 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
           <button class="btn sm" style="margin-top:6px" data-act="pdfSave" data-b="${b.id}">Save link</button></div>
         <div class="card"><h2>Chapter progress</h2>${chRows}</div>
       </div>
-      <div class="callout section-gap"><b>Order to solve:</b> first every 🎯 GATE-likely question of the chapter you just studied, then the Good-practice ones. Self-Test questions have full solutions at the back of the book (page shown), so use them to check your method. Page numbers are the PDF's "N of 848" footer.
-        <br><b>Asked in GATE?</b> The PYQ pattern shows which type of GATE question each problem trains. Which exact GATE question (year and number) matches a problem will be added once the GATE DA 2024–2026 papers are shared.</div>
+      <div class="callout section-gap">${b.pyq ? `<b>How to use:</b> after finishing a topic, solve its PYQs timed in that year's paper PDF (page shown). Before January, solve every PYQ of every topic at least once.` : `<b>Order to solve:</b> first every 🎯 GATE-likely question of the chapter you just studied, then the Good-practice ones. ${b.q.some(q => q.o) ? "Self-Test questions have full solutions at the back of the book (page shown). " : ""}Page numbers are the page numbers in your PDF viewer.`}
+        <br><b>Asked in GATE?</b> Every question shows whether the same type was asked in GATE DA 2024–2026, with the exact year and question number.</div>
       <div class="card section-gap">
+        <h2 style="margin-bottom:12px">Showing: ${b.pyq ? "📄 " : "📘 "}${esc(b.title)}</h2>
         <div class="grid g4" style="align-items:end">
           <label class="field"><span>${b.pyq ? "Year" : "Chapter"}</span>${sel("ch", [["all", b.pyq ? "All years" : "All chapters"], ...Object.entries(b.chapters).map(([c, n]) => [c, b.pyq ? n : "Ch " + c + " · " + n])])}</label>
           ${b.pyq ? "" : `<label class="field"><span>GATE relevance</span>${sel("g", [["3", "🎯 GATE-likely only"], ["2", "🎯 + Good practice"]])}</label>`}
