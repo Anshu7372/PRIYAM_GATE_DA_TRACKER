@@ -13,16 +13,15 @@
      q    how PYQs ask this topic
      m    must-know facts (Claude adds these if your notes miss them)
      sub  [subtopic, [sub-subtopics]]
-   PYQ frequencies are from a memory-based analysis of the 2024–2026
-   papers. Verify them against the GATE Overflow "gate-da" tags as you
-   solve the PYQs.
+   Mark ranges are the actual min–max across the GATE DA 2024–2026 papers.
+   The tracker recomputes each topic's PYQ frequency from js/pyq.js.
    ===================================================================== */
 
 const SUBJECTS = [
 /* ------------------------------------------------------------------ */
 {
-  id: "ps", name: "Probability & Statistics", short: "P&S", color: "#e8590c", marks: "16–22",
-  why: "Most important maths subject. It also feeds ML (Naive Bayes, LDA, regression) and AI (Bayes nets), so learning it well pays off three times.",
+  id: "ps", name: "Probability & Statistics", short: "P&S", color: "#e8590c", marks: "15–21",
+  why: "Most important maths subject, and growing: 15 → 19 → 21 marks in 2024–2026, with tougher questions each year. It also feeds ML (Naive Bayes, LDA, regression) and AI (Bayes nets), so learning it well pays off three times.",
   books: [
     ["Sheldon Ross — A First Course in Probability (10th ed)", "Main book for probability. Its chapters follow the GATE syllabus order."],
     ["Sheldon Ross — Introduction to Probability and Statistics for Engineers and Scientists", "Confidence intervals, z/t/chi-square tests, CLT. Close to GATE DA style."],
@@ -148,7 +147,7 @@ const SUBJECTS = [
 },
 /* ------------------------------------------------------------------ */
 {
-  id: "la", name: "Linear Algebra", short: "LA", color: "#1c7ed6", marks: "10–14",
+  id: "la", name: "Linear Algebra", short: "LA", color: "#1c7ed6", marks: "8–12",
   why: "The base for ML (regression = projection, PCA = eigen/SVD). DA questions are conceptual (rank, eigen properties, projection matrices), not heavy calculation.",
   books: [
     ["Gilbert Strang — Introduction to Linear Algebra (5th ed)", "Main book. The GATE DA syllabus follows Strang closely (projection, SVD, four subspaces)."],
@@ -247,7 +246,7 @@ const SUBJECTS = [
 },
 /* ------------------------------------------------------------------ */
 {
-  id: "co", name: "Calculus & Optimization", short: "Calc", color: "#2f9e44", marks: "5–8",
+  id: "co", name: "Calculus & Optimization", short: "Calc", color: "#2f9e44", marks: "3–9",
   why: "Small syllabus with standard questions. Also needed for PDF integration (P&S) and gradient descent (ML).",
   books: [
     ["Thomas' Calculus (12th+ ed)", "Main book for limits, continuity, derivatives, extrema and Taylor series."],
@@ -436,7 +435,7 @@ const SUBJECTS = [
 },
 /* ------------------------------------------------------------------ */
 {
-  id: "db", name: "DBMS & Data Warehousing", short: "DBMS", color: "#c2255c", marks: "8–12",
+  id: "db", name: "DBMS & Data Warehousing", short: "DBMS", color: "#c2255c", marks: "7–18",
   why: "A scoring subject. The warehousing and preprocessing wording in the syllabus comes directly from Han & Kamber, which makes it easy to target.",
   books: [
     ["Silberschatz, Korth — Database System Concepts (6th/7th ed)", "Main book for relational model, SQL, ER, normalization and indexing."],
@@ -534,8 +533,8 @@ const SUBJECTS = [
 },
 /* ------------------------------------------------------------------ */
 {
-  id: "ml", name: "Machine Learning", short: "ML", color: "#0c8599", marks: "16–22",
-  why: "The heaviest subject with P&S. DA questions are numerical: compute a regression coefficient, run one k-means iteration, calculate an information gain or a Naive Bayes posterior.",
+  id: "ml", name: "Machine Learning", short: "ML", color: "#0c8599", marks: "13–15",
+  why: "Asked for 13–15 marks in 2024–2026, and the ML questions have been getting easier. DA questions are numerical: compute a regression coefficient, run one k-means iteration, calculate an information gain or a Naive Bayes posterior.",
   books: [
     ["James, Witten, Hastie, Tibshirani — An Introduction to Statistical Learning (ISL/ISLP, free PDF)", "Main book. Its chapters match the syllabus terms: LOOCV, k-fold, ridge, LDA, bias-variance."],
     ["NPTEL — Introduction to Machine Learning (IIT Madras, Balaraman Ravindran)", "Weekly assignments are very close to GATE DA style."],
@@ -660,7 +659,7 @@ const SUBJECTS = [
 },
 /* ------------------------------------------------------------------ */
 {
-  id: "ai", name: "Artificial Intelligence", short: "AI", color: "#f08c00", marks: "8–12",
+  id: "ai", name: "Artificial Intelligence", short: "AI", color: "#f08c00", marks: "6–10",
   why: "The syllabus follows Russell & Norvig (AIMA) closely. Hand-traced search, alpha-beta, logic and Bayes-net questions give reliable marks once practised.",
   books: [
     ["Russell & Norvig — AIMA (3rd ed; 4th ed chapter numbers in brackets)", "Main book. 'Variable elimination' and 'approximate inference through sampling' come from AIMA Ch 14 (3rd) / Ch 13 (4th)."],

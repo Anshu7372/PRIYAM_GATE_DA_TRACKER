@@ -25,8 +25,14 @@
   SUBJECTS.forEach(s => { SUBJ[s.id] = s; s.topics.forEach(t => { t.subj = s.id; TOPIC[t.id] = t; }); });
   const ALL_TOPICS = SUBJECTS.flatMap(s => s.topics);
   const itemIds = t => t.sub.flatMap((sb, si) => sb[1].map((_, ii) => t.id + ":" + si + ":" + ii));
-  const TARGET = { ga: 13, ps: 17, la: 11, co: 6, pd: 16, db: 9, ml: 16, ai: 9 };
-  const MAXM = { ga: 15, ps: 20, la: 12, co: 7, pd: 18, db: 10, ml: 20, ai: 10 };
+  const TARGET = { ga: 13, ps: 15, la: 9, co: 6, pd: 14, db: 10, ml: 12, ai: 7 };
+
+  /* ---- GATE DA PYQs (actual 2024–2026 papers) ---- */
+  const PYQS = typeof PYQ !== "undefined" ? PYQ.q : [];
+  const PYQ_BY_TID = {}, PYQ_BY_K = {};
+  PYQS.forEach(q => { (PYQ_BY_TID[q.tid] ||= []).push(q); if (q.k) (PYQ_BY_K[q.k] ||= []).push(q); });
+  if (PYQS.length) ALL_TOPICS.forEach(t => { const n = (PYQ_BY_TID[t.id] || []).length; t.pyqN = n; t.f = n >= 3 ? "H" : n >= 1 ? "M" : "L"; });
+  const pyqRefs = list => list.map(q => q.y + " Q." + q.n).join(", ");
 
   /* ================= state ================= */
   const KEY = "gateda27_tracker_v1";
@@ -287,6 +293,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
   /* ================= small UI builders ================= */
   const bar = (p, color) => `<div class="bar"><span style="width:${Math.max(0, Math.min(100, p))}%;${color ? "background:" + color : ""}"></span></div>`;
   const tag = (f) => `<span class="tag ${f}">${f === "H" ? "PYQ: High" : f === "M" ? "PYQ: Medium" : "PYQ: Low"}</span>`;
+  const lvlTag = l => `<span class="tag ${l === "H" ? "H" : l === "M" ? "M" : "L"}">${l === "H" ? "Hard" : l === "M" ? "Medium" : "Easy"}</span>`;
   const topicLink = id => `<a href="#syllabus" data-act="goto" data-t="${id}">${esc(TOPIC[id].n)}</a>`;
   function lineChart(points, opts = {}) {
     const W = 640, H = 220, P = 34, max = opts.max || 100;
@@ -439,7 +446,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     const subs = t.sub.map(([name, items], si) => `<div class="sub-block"><h4>${esc(name)}</h4>${items.map((it, ii) => { const id = t.id + ":" + si + ":" + ii; const on = !!S.items[id]; return `<label class="check ${on ? "done" : ""}"><input type="checkbox" data-ch="item" data-id="${id}" ${on ? "checked" : ""}><span>${esc(it)}</span></label>`; }).join("")}</div>`).join("");
     const acc = st.att ? Math.round(st.cor / st.att * 100) : null;
     return `<details class="topic" data-t="${t.id}" ${open ? "open" : ""}><summary>
-      <div><div class="topic-title">${esc(t.n)}</div><div class="topic-meta">${tag(t.f)}<span class="tag">~${t.h} h</span>${PLAN_START[t.id] && t.subj !== "ga" ? `<span class="tag">${fmt(PLAN_START[t.id])} → ${fmt(PLAN_END[t.id])}</span>` : ""}${S.rev[t.id] ? `<span class="tag H">🔥 in revision</span>` : ""}${st.done ? `<span class="tag L">✓ concepts done</span>` : ""}</div></div>
+      <div><div class="topic-title">${esc(t.n)}</div><div class="topic-meta">${tag(t.f)}${t.pyqN !== undefined ? `<span class="tag">${t.pyqN} PYQ${t.pyqN === 1 ? "" : "s"}</span>` : ""}<span class="tag">~${t.h} h</span>${PLAN_START[t.id] && t.subj !== "ga" ? `<span class="tag">${fmt(PLAN_START[t.id])} → ${fmt(PLAN_END[t.id])}</span>` : ""}${S.rev[t.id] ? `<span class="tag H">🔥 in revision</span>` : ""}${st.done ? `<span class="tag L">✓ concepts done</span>` : ""}</div></div>
       <div class="topic-prog"><div style="text-align:right;font-size:.85rem;color:var(--muted)">${p}%</div>${bar(p, s.color)}</div></summary>
       <div class="topic-body">
         <div class="callout" style="margin-top:12px"><b>Depth for GATE:</b> ${esc(t.d)}</div>
@@ -449,6 +456,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
           <div class="info"><h4>✍️ Practise from (question target)</h4><ul>${t.p.map(x => `<li>${esc(x[0])} <b>· ${esc(x[1])}</b></li>`).join("")}</ul></div>
           <div class="info"><h4>🎯 How GATE asks it</h4><p style="margin:0">${esc(t.q)}</p></div>
           <div class="info"><h4>⚡ Must-know (Claude adds these if your notes miss them)</h4><ul>${t.m.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+          <div class="info" style="grid-column:1/-1"><h4>📄 Asked in GATE DA 2024–2026 (actual papers)</h4>${(PYQ_BY_TID[t.id] || []).length ? `<ul>${PYQ_BY_TID[t.id].map(q => `<li><b>${q.y} Q.${q.n}</b> · ${q.m} mark${q.m > 1 ? "s" : ""} · ${q.ty} · ${lvlTag(q.l)} ${esc(q.t)}</li>`).join("")}</ul>` : `<p style="margin:0" class="muted">Not asked in 2024–2026. Still in the syllabus, so cover it, but give it less time than the topics above.</p>`}</div>
         </div>
         <div class="controls">
           <label class="check"><input type="checkbox" data-ch="book" data-t="${t.id}" ${st.book ? "checked" : ""}><span>Book questions done</span></label>
@@ -463,30 +471,56 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
           <button class="btn sm" data-act="copyExplain" data-t="${t.id}">📋 Claude explainer prompt</button>
           <button class="btn sm" data-act="copyPyq" data-t="${t.id}">📋 Claude practice-set prompt</button>
           <button class="btn sm" data-act="noteFor" data-t="${t.id}">📝 Add short note</button>
-          ${practiceCount(t.id) ? `<button class="btn sm" data-act="practiceTopic" data-t="${t.id}">✍️ Book questions (${practiceCount(t.id)})</button>` : ""}
+          ${practiceCount(t.id) ? `<button class="btn sm" data-act="practiceTopic" data-t="${t.id}" data-b="${firstBookFor(t.id)}">✍️ Book questions (${practiceCount(t.id)})</button>` : ""}
+          ${(PYQ_BY_TID[t.id] || []).length ? `<button class="btn sm" data-act="practiceTopic" data-t="${t.id}" data-b="pyq">📄 GATE PYQs (${PYQ_BY_TID[t.id].length})</button>` : ""}
         </div>
       </div></details>`;
   }
 
   VIEWS.pyqmap = () => {
-    const heat = SUBJECTS.map(s => `<div class="heat-row"><div><b><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</b><br><small>≈ ${esc(s.marks)} marks</small></div>
-      <div class="heat-cells">${s.topics.map(t => `<span class="heat-cell ${t.f} ${conceptPct(t) === 1 ? "done" : ""}" data-act="goto" data-t="${t.id}" title="${esc(t.q)}">${esc(t.n.split("(")[0].split(":")[0].trim())}</span>`).join("")}</div></div>`).join("");
-    const rows = ALL_TOPICS.map(t => `<tr><td><span class="dot" style="background:${SUBJ[t.subj].color}"></span>${esc(SUBJ[t.subj].short)}</td><td>${topicLink(t.id)}</td><td>${tag(t.f)}</td><td>${esc(t.q)}</td><td>${esc(t.p[0][0])}</td></tr>`).join("");
+    const YEARS = PYQS.length ? Object.keys(PYQ.papers).map(Number) : [];
+    const LV = { E: 1, M: 2, H: 3 };
+    const agg = {};
+    SUBJECTS.forEach(s => { agg[s.id] = {}; YEARS.forEach(y => agg[s.id][y] = { q: 0, m: 0, lv: 0, H: 0, E: 0 }); });
+    PYQS.forEach(q => { const a = agg[q.tid.slice(0, 2)][q.y]; a.q++; a.m += q.m; a.lv += LV[q.l] * q.m; a[q.l] = (a[q.l] || 0) + 1; });
+    const avg = a => a.m ? a.lv / a.m : 0;
+    const lvWord = v => !v ? "—" : v < 1.6 ? "Easy" : v < 1.85 ? "Moderate" : v < 2.0 ? "Moderate–tough" : "Tough";
+    const lvCls = v => v < 1.6 ? "L" : v < 1.85 ? "acc" : v < 2.0 ? "M" : "H";
+    const trend = s => { if (YEARS.length < 2) return ""; const a = avg(agg[s][YEARS[0]]), b = avg(agg[s][YEARS[YEARS.length - 1]]); const d = b - a; return d > 0.15 ? `<span style="color:var(--bad)">▲ getting tougher</span>` : d < -0.15 ? `<span style="color:var(--good)">▼ getting easier</span>` : `<span class="muted">● about the same</span>`; };
+    const mtrend = s => { if (YEARS.length < 2) return ""; const a = agg[s][YEARS[0]].m, b = agg[s][YEARS[YEARS.length - 1]].m; return b - a >= 3 ? `▲ ${a}→${b}` : a - b >= 3 ? `▼ ${a}→${b}` : `≈ ${a}→${b}`; };
+    const tableRows = SUBJECTS.map(s => `<tr><td><span class="dot" style="background:${s.color}"></span>${esc(s.short)}</td>${YEARS.map(y => { const a = agg[s.id][y]; return `<td>${a.m} marks <small class="muted">(${a.q} Q)</small><br><span class="tag ${lvCls(avg(a))}">${lvWord(avg(a))}</span>${a.H ? ` <small style="color:var(--bad)">${a.H} hard</small>` : ""}</td>`; }).join("")}<td style="white-space:nowrap">${mtrend(s.id)}</td><td style="white-space:nowrap">${trend(s.id)}</td></tr>`).join("");
+    const yearLv = y => PYQS.filter(q => q.y === y).reduce((t, q) => t + LV[q.l] * q.m, 0) / 100;
+    const types = y => ["MCQ", "MSQ", "NAT"].map(t => t + " " + PYQS.filter(q => q.y === y && q.ty === t).length).join(" · ");
+    const hardList = PYQS.filter(q => q.l === "H");
+    const heat = SUBJECTS.map(s => `<div class="heat-row"><div><b><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</b><br><small>${esc(s.marks)} marks in 2024–26</small></div>
+      <div class="heat-cells">${s.topics.map(t => `<span class="heat-cell ${t.f} ${conceptPct(t) === 1 ? "done" : ""}" data-act="goto" data-t="${t.id}" title="${esc(pyqRefs(PYQ_BY_TID[t.id] || []) || "Not asked in 2024–26")}">${esc(t.n.split("(")[0].split(":")[0].trim())}${t.pyqN !== undefined ? ` · ${t.pyqN}` : ""}</span>`).join("")}</div></div>`).join("");
+    const rows = ALL_TOPICS.map(t => `<tr><td><span class="dot" style="background:${SUBJ[t.subj].color}"></span>${esc(SUBJ[t.subj].short)}</td><td>${topicLink(t.id)}</td><td class="num">${t.pyqN ?? "—"}</td><td>${(PYQ_BY_TID[t.id] || []).map(q => `<span class="tag ${q.l === "H" ? "H" : q.l === "M" ? "M" : "L"}" title="${esc(q.t)}">${q.y} Q.${q.n}</span>`).join(" ") || `<span class="muted">—</span>`}</td><td>${esc(t.q)}</td></tr>`).join("");
     const cnt = f => ALL_TOPICS.filter(t => t.f === f).length;
-    return `<div class="page-head"><div><h1>PYQ Map: the big picture</h1><p>Every syllabus topic, coloured by how often GATE DA has asked it (2024–2026). A green border means you have finished its concepts. Click any topic to open it.</p></div></div>
-      <div class="grid g3"><div class="card kpi"><div class="label">High-frequency topics</div><div class="value" style="color:var(--bad)">${cnt("H")}</div><div class="hint">asked in almost every paper: master these first</div></div>
-      <div class="card kpi"><div class="label">Medium</div><div class="value" style="color:var(--warn)">${cnt("M")}</div><div class="hint">asked in some papers</div></div>
-      <div class="card kpi"><div class="label">Low / support</div><div class="value" style="color:var(--good)">${cnt("L")}</div><div class="hint">rare, or needed for other topics</div></div></div>
-      <div class="card section-gap"><h2>Syllabus heat-map</h2><div class="heat">${heat}</div></div>
+    return `<div class="page-head"><div><h1>PYQ Map & Analysis</h1><p>Built from the actual GATE DA ${YEARS.join(", ")} papers: ${PYQS.length} questions, each tagged to a syllabus topic, with a level (Easy / Medium / Hard, our judgement after reading every question).</p></div>
+      <a class="btn" href="#practice" data-act="practiceTopic" data-t="all" data-b="pyq">📄 Open all PYQs</a></div>
+      <div class="grid g3">${YEARS.map(y => `<div class="card kpi"><div class="label">GATE DA ${y} · ${esc(PYQ.papers[y].inst)}</div><div class="value" style="font-size:1.5rem">${lvWord(yearLv(y))}</div><div class="hint">${PYQS.filter(q => q.y === y && q.l === "H").length} hard questions · ${types(y)}</div></div>`).join("")}</div>
+      <div class="card section-gap"><h2>Subject-wise, year by year</h2>
+        <div class="table-wrap"><table><thead><tr><th>Subject</th>${YEARS.map(y => `<th>${y}</th>`).join("")}<th>Marks trend</th><th>Level trend</th></tr></thead><tbody>${tableRows}</tbody></table></div>
+        <p class="muted" style="margin-top:8px">Level = marks-weighted average of question levels (Easy 1, Medium 2, Hard 3). Easy &lt; 1.6 ≤ Moderate &lt; 1.85 ≤ Moderate–tough &lt; 2.0 ≤ Tough.</p></div>
+      <div class="card section-gap"><h2>What the three papers say</h2><ul style="margin:0">
+        <li><b>Probability &amp; Statistics is growing and getting tougher</b>: 15 → 19 → 21 marks, and the level rose every year. It is now the biggest subject. Give it the most practice time.</li>
+        <li><b>DBMS jumped</b>: 7 → 11 → 18 marks in 2026 (SQL, relational algebra, TRC, B+ trees, FDs, ER, cuboids). Since 2025 the level has been moderate–tough and steady; these are standard GATE CS-style questions, so they are scoring marks if you practise them.</li>
+        <li><b>PDSA got harder</b> after 2024: 20 → 14 → 14 marks, but the questions moved from easy recall to Python output tracing and algorithm traces. Python output questions appear every year (8 in total).</li>
+        <li><b>ML and AI got easier</b>: ML fell to 13 marks in 2026 with mostly easy, direct questions (PCA, ridge, MLP parameters, precision/recall). AI questions are short concept checks plus one search or game-tree trace.</li>
+        <li><b>Linear Algebra is steady</b> at 8–12 marks and moderate level: eigenvalues, special matrices (projection, orthogonal, centering), subspaces, SVD.</li>
+        <li><b>Calculus is shrinking</b>: 8 → 9 → 3 marks. Maxima/minima and limits are enough; don't over-invest.</li>
+        <li><b>The overall paper level is the same each year</b> (moderate). The ${hardList.length} hard questions (${hardList.map(q => q.y + " Q." + q.n).join(", ")}) are spread out: 4 from probability (conditional expectation, exponential tricks, subset counting, CLT limit) and one each from Fisher LDA, projection matrices, SQL, Bayes-net inference, Python, DFS and a GA digit puzzle.</li>
+        <li><b>NAT and MSQ are about half the paper</b>, so guessing does not help. Practise computing exact numbers.</li></ul>
+        <p class="callout warn" style="margin-top:12px">Levels are our judgement after reading each question; the marks and question counts are exact. Answer keys are not in these PDFs.</p></div>
+      <div class="card section-gap"><h2>Syllabus heat-map (number = PYQs in 2024–26)</h2>
+        <div class="grid g3" style="margin-bottom:12px"><div class="kpi"><div class="label">Asked 3+ times</div><div class="value" style="color:var(--bad)">${cnt("H")}</div></div><div class="kpi"><div class="label">Asked 1–2 times</div><div class="value" style="color:var(--warn)">${cnt("M")}</div></div><div class="kpi"><div class="label">Not asked yet</div><div class="value" style="color:var(--good)">${cnt("L")}</div></div></div>
+        <div class="heat">${heat}</div></div>
       <div class="card section-gap"><h2>Paper pattern</h2><ul style="margin:0">
         <li>65 questions, 100 marks, 3 hours. GA = 10 Qs (15 marks); DA subjects = 55 Qs (85 marks).</li>
-        <li>Types: MCQ (negative −1/3 for 1-mark, −2/3 for 2-mark), MSQ (no negative, no partial credit), NAT (no negative).</li>
-        <li>DA questions are mostly <b>numerical and conceptual</b>: hand-computations (Bayes, eigenvalues, regression, k-means, entropy, alpha-beta, SQL output, Python output), not long derivations.</li>
-        <li>Every subject needs about 35–40% NAT-style practice. Use the "PYQs attempted/correct" counters to track accuracy.</li></ul>
-        <p class="callout warn" style="margin-top:12px">These frequencies come from a memory-based review of the 2024–2026 papers. Verify each one against the GATE Overflow "gate-da" tags or your GO Classes PYQ sheets as you solve them, and change a topic's priority if the real papers disagree.</p></div>
-      <div class="card section-gap"><h2>Topic-wise PYQ mapping</h2><div class="table-wrap"><table><thead><tr><th>Subj</th><th>Topic</th><th>Freq</th><th>How it is asked</th><th>Main practice source</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+        <li>Q.1–5 and Q.11–35 carry 1 mark; Q.6–10 and Q.36–65 carry 2 marks.</li>
+        <li>MCQ: negative marking (−1/3 for 1-mark, −2/3 for 2-mark). MSQ and NAT: no negative marking, no partial credit.</li></ul></div>
+      <div class="card section-gap"><h2>Topic-wise PYQ list</h2><div class="table-wrap"><table><thead><tr><th>Subj</th><th>Topic</th><th class="num">PYQs</th><th>Asked in (colour = level)</th><th>How it is asked</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   };
-
   VIEWS.schedule = () => {
     const t = today();
     const gantt = ["A", "B"].map(tr => {
@@ -732,8 +766,18 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
 
   /* ---------- Books ---------- */
   /* ---------- Practice question bank ---------- */
-  const PBOOKS = typeof PRACTICE_BOOKS !== "undefined" ? PRACTICE_BOOKS : [];
-  const SECNAME = { P: "Problem", TE: "Theoretical Ex.", ST: "Self-Test" };
+  const PBOOKS = typeof PRACTICE_BOOKS !== "undefined" ? PRACTICE_BOOKS.slice() : [];
+  if (PYQS.length) {
+    const pats = { ...(PBOOKS[0] ? PBOOKS[0].patterns : {}) };
+    PYQS.forEach(q => { pats["T:" + q.tid] = { tid: q.tid, label: TOPIC[q.tid] ? TOPIC[q.tid].n.split("(")[0].split(":")[0].trim() : q.tid }; });
+    const ch = {}; Object.entries(PYQ.papers).forEach(([y, v]) => ch[y] = "GATE DA " + y + " · " + v.inst);
+    PBOOKS.unshift({ id: "pyq", pyq: true, title: "GATE DA previous-year papers (2024–2026)", short: "GATE PYQ", subj: "ps", chapters: ch, patterns: pats,
+      notes: "These are the actual GATE DA papers. Solve each question in that year's paper PDF at the page shown, ideally timed. Answer keys are not in these PDFs, so check with the official GATE answer key. Level is our judgement.",
+      q: PYQS.map(q => ({ c: q.y, s: "Q", n: q.n, p: q.p, l: q.l, g: 3, k: "T:" + q.tid, pk: q.k, t: q.t, m: q.m, ty: q.ty })) });
+  }
+  const SECNAME = { P: "Problem", TE: "Theoretical Ex.", ST: "Self-Test", Q: "Q." };
+  const qLabel = (b, q) => b.pyq ? `GATE ${q.c} · Q.${q.n}` : `Ch ${q.c} · ${SECNAME[q.s]} ${b.dotted && q.c > 2 ? q.c + "." : ""}${q.n}`;
+  const askedLine = (b, q) => { if (b.pyq) return `<span class="tag">${q.m} mark${q.m > 1 ? "s" : ""} · ${q.ty}</span>`; const l = PYQ_BY_K[q.k]; return l ? `<span style="color:var(--good)">✔ Same type asked in GATE DA: ${esc(pyqRefs(l))}</span>` : `<span class="muted">Same type not asked in GATE DA 2024–26</span>`; };
   const GNAME = { 3: "🎯 GATE-likely", 2: "Good practice" };
   const STNAME = { s: "Done", h: "Done but hard", w: "Wrong" };
   const statusBtns = k => { const s = S.practice[k]; return `<div class="btn-row" style="flex-wrap:nowrap">${[["s", "✓ Done", "good"], ["h", "Hard", "warn"], ["w", "✗ Wrong", "bad"]].map(([v, l, c]) => `<button class="btn sm ${s === v ? c : ""}" data-act="pq" data-k="${k}" data-v="${v}" title="${STNAME[v]}">${l}</button>`).join("")}</div>`; };
@@ -741,8 +785,9 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
   const errorLog = () => Object.keys(S.practice).filter(k => (S.practice[k] === "h" || S.practice[k] === "w") && qByKey(k));
   const LNAME = { E: "Easy", M: "Medium", H: "Hard" };
   const qKey = (b, q) => b.id + ":" + q.c + q.s + q.n;
-  const qName = (b, q) => b.short + " Ch " + q.c + " · " + SECNAME[q.s] + " " + (b.dotted && q.c > 2 ? q.c + "." : "") + q.n;
-  function practiceCount(tid) { let n = 0; PBOOKS.forEach(b => b.q.forEach(q => { if (q.g >= 2 && b.patterns[q.k].tid === tid) n++; })); return n; }
+  const qName = (b, q) => b.short + " " + qLabel(b, q);
+  function practiceCount(tid, bid) { let n = 0; PBOOKS.forEach(b => { if (b.pyq || (bid && b.id !== bid)) return; b.q.forEach(q => { if (b.patterns[q.k].tid === tid) n++; }); }); return n; }
+  const firstBookFor = tid => (PBOOKS.find(b => !b.pyq && b.q.some(q => b.patterns[q.k].tid === tid)) || {}).id;
   function pfilter(b, f) {
     return b.q.filter(q => (f.ch === "all" || String(q.c) === f.ch) && (f.sec === "all" || q.s === f.sec) && (f.lvl === "all" || q.l === f.lvl)
       && (f.g === "all" || q.g >= +f.g && (f.g !== "0" || true)) && (f.tid === "all" || b.patterns[q.k].tid === f.tid)
@@ -756,7 +801,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     if (f.ch !== "all" && !b.chapters[f.ch]) f.ch = "all";
     const st = k => S.practice[k];
     const tally = list => ({ n: list.length, s: list.filter(q => st(qKey(b, q)) === "s").length, w: list.filter(q => ["w", "h"].includes(st(qKey(b, q)))).length });
-    const tiers = [3, 2].map(g => ({ g, ...tally(b.q.filter(q => q.g === g)) }));
+    const tiers = (b.pyq ? [3] : [3, 2]).map(g => ({ g, ...tally(b.q.filter(q => q.g === g)) }));
     const chRows = Object.keys(b.chapters).map(c => { const t = tally(b.q.filter(q => String(q.c) === c)); return `<div class="subj-row"><div>Ch ${c} <small>${esc(b.chapters[c])}</small></div>${bar(t.n ? (t.s + t.w) / t.n * 100 : 0, SUBJ[b.subj].color)}<div class="pct">${t.s + t.w}/${t.n}</div></div>`; }).join("");
     const list = pfilter(b, f), shown = list.slice(0, f.limit);
     const tids = [...new Set(b.q.map(q => b.patterns[q.k].tid))].filter(t => TOPIC[t]);
@@ -764,20 +809,20 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     const link = (S.settings.pdf || {})[b.id];
     const rows = shown.map(q => {
       const k = qKey(b, q), s = st(k), pat = b.patterns[q.k];
-      return `<tr><td style="white-space:nowrap"><b>Ch ${q.c} · ${SECNAME[q.s]} ${b.dotted && q.c > 2 ? q.c + "." : ""}${q.n}</b>${q.x ? ` <span title="Starred as harder in the book">★</span>` : ""}</td>
+      return `<tr><td style="white-space:nowrap"><b>${qLabel(b, q)}</b>${q.x ? ` <span title="Starred as harder in the book">★</span>` : ""}</td>
         <td class="num" style="white-space:nowrap">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">p. ${q.p}</a>` : `p. ${q.p}`}</td>
-        <td>${esc(q.t)}<br><small class="muted">PYQ pattern: ${esc(pat.label)}${TOPIC[pat.tid] ? " · " + esc(TOPIC[pat.tid].n.split("(")[0].split(":")[0].trim()) : ""}</small></td>
+        <td>${esc(q.t)}<br><small class="muted">${b.pyq ? "Topic" : "PYQ pattern"}: ${esc(pat.label)}${!b.pyq && TOPIC[pat.tid] ? " · " + esc(TOPIC[pat.tid].n.split("(")[0].split(":")[0].trim()) : ""}</small><br><small>${askedLine(b, q)}</small></td>
         <td><span class="tag ${q.l === "H" ? "H" : q.l === "M" ? "M" : "L"}">${LNAME[q.l]}</span></td>
-        <td><span class="tag ${q.g === 3 ? "acc" : ""}">${GNAME[q.g]}</span></td>
+        <td><span class="tag ${q.g === 3 ? "acc" : ""}">${b.pyq ? "📄 Actual PYQ" : GNAME[q.g]}</span></td>
         <td style="white-space:nowrap">${q.a ? `<small>Ans p. ${q.a}</small>` : ""}${q.o ? `<small>Solution p. ${q.o}</small>` : ""}${!q.a && !q.o ? `<small class="muted">—</small>` : ""}</td>
         <td>${statusBtns(k)}</td></tr>`;
     }).join("");
-    const bookChips = PBOOKS.map(x => `<button class="chip ${x.id === b.id ? "active" : ""}" data-act="pfBook" data-b="${x.id}">${esc(x.short)} (${x.q.length})</button>`).join("");
+    const bookChips = PBOOKS.map(x => `<button class="chip ${x.id === b.id ? "active" : ""}" data-act="pfBook" data-b="${x.id}">${x.pyq ? "📄 " : ""}${esc(x.short)} (${x.q.length})</button>`).join("");
     return `<div class="page-head"><div><h1>Practice Questions</h1><p>Only GATE-relevant exercises from your books, tagged by level, GATE relevance and PYQ pattern. Solve each one in your PDF at the page shown, so the question, figures and numbers are exactly the book's. Mark it <b>Done</b>, <b>Hard</b> (done but tough) or <b>Wrong</b>. Hard and Wrong go to the <a href="#errorlog">Error Log</a>; Wrong also adds the topic to Revision.</p></div></div>
       <div class="chips">${bookChips}</div>
       <div class="grid g2">
         <div class="card"><h2>${esc(b.title)}</h2>
-          <div class="grid g2" style="margin-top:6px">${tiers.map(t => `<div class="kpi"><div class="label">${GNAME[t.g]}</div><div class="value" style="font-size:1.5rem">${t.s + t.w}<small style="font-size:.9rem"> / ${t.n}</small></div><div class="hint">${t.w ? `<span style="color:var(--bad)">${t.w} in Error Log</span>` : "&nbsp;"}</div></div>`).join("")}</div>
+          <div class="grid g2" style="margin-top:6px">${tiers.map(t => `<div class="kpi"><div class="label">${b.pyq ? "Solved" : GNAME[t.g]}</div><div class="value" style="font-size:1.5rem">${t.s + t.w}<small style="font-size:.9rem"> / ${t.n}</small></div><div class="hint">${t.w ? `<span style="color:var(--bad)">${t.w} in Error Log</span>` : "&nbsp;"}</div></div>`).join("")}</div>
           <p class="muted" style="margin-top:10px">${esc(b.notes)}</p>
           <label class="field" style="margin-top:8px"><span>Your PDF link (optional; page numbers open in your viewer)</span><input type="text" id="pdfLink" value="${esc(link || "")}" placeholder="Paste your Google Drive link"></label>
           <button class="btn sm" style="margin-top:6px" data-act="pdfSave" data-b="${b.id}">Save link</button></div>
@@ -787,8 +832,8 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
         <br><b>Asked in GATE?</b> The PYQ pattern shows which type of GATE question each problem trains. Which exact GATE question (year and number) matches a problem will be added once the GATE DA 2024–2026 papers are shared.</div>
       <div class="card section-gap">
         <div class="grid g4" style="align-items:end">
-          <label class="field"><span>Chapter</span>${sel("ch", [["all", "All chapters"], ...Object.entries(b.chapters).map(([c, n]) => [c, "Ch " + c + " · " + n])])}</label>
-          <label class="field"><span>GATE relevance</span>${sel("g", [["3", "🎯 GATE-likely only"], ["2", "🎯 + Good practice"]])}</label>
+          <label class="field"><span>${b.pyq ? "Year" : "Chapter"}</span>${sel("ch", [["all", b.pyq ? "All years" : "All chapters"], ...Object.entries(b.chapters).map(([c, n]) => [c, b.pyq ? n : "Ch " + c + " · " + n])])}</label>
+          ${b.pyq ? "" : `<label class="field"><span>GATE relevance</span>${sel("g", [["3", "🎯 GATE-likely only"], ["2", "🎯 + Good practice"]])}</label>`}
           <label class="field"><span>Syllabus topic</span>${sel("tid", [["all", "All topics"], ...tids.map(t => [t, TOPIC[t].n.split("(")[0].trim()])])}</label>
           <label class="field"><span>Status</span>${sel("st", [["todo", "Not attempted"], ["h", "Done but hard"], ["w", "Wrong"], ["s", "Done"], ["all", "All"]])}</label>
           <label class="field"><span>Section</span>${sel("sec", [["all", "All sections"], ["P", "Problems"], ["ST", "Self-Test (with solutions)"], ["TE", "Theoretical Exercises"]].filter(([v]) => v === "all" || b.q.some(q => q.s === v)))}</label>
@@ -803,7 +848,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
   VIEWS.errorlog = () => {
     const keys = errorLog();
     const rows = keys.map(k => { const { b, q } = qByKey(k); const pat = b.patterns[q.k]; const link = (S.settings.pdf || {})[b.id];
-      return `<tr><td style="white-space:nowrap"><b>${esc(b.short)}</b><br>Ch ${q.c} · ${SECNAME[q.s]} ${b.dotted && q.c > 2 ? q.c + "." : ""}${q.n}</td>
+      return `<tr><td style="white-space:nowrap"><b>${esc(b.short)}</b><br>${qLabel(b, q)}</td>
         <td class="num">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">p. ${q.p}</a>` : `p. ${q.p}`}</td>
         <td>${esc(q.t)}<br><small class="muted">${esc(pat.label)}</small></td>
         <td><span class="tag ${S.practice[k] === "w" ? "H" : "M"}">${STNAME[S.practice[k]]}</span></td>
@@ -940,7 +985,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     pfBook: el => { S.ui.pf = { ...S.ui.pf, book: el.dataset.b, ch: "all", tid: "all", limit: 50 }; save(); render(); },
     pfMore: () => { S.ui.pf.limit += 50; save(); render(); },
     pdfSave: el => { S.settings.pdf = { ...(S.settings.pdf || {}), [el.dataset.b]: $("#pdfLink").value.trim() }; save(); toast("PDF link saved."); render(); },
-    practiceTopic: el => { S.ui.pf = { ...(S.ui.pf || {}), tid: el.dataset.t, st: "todo", g: "2", ch: "all", sec: "all", lvl: "all", limit: 50 }; save(); go("practice"); },
+    practiceTopic: el => { S.ui.pf = { ...(S.ui.pf || {}), book: el.dataset.b || (S.ui.pf || {}).book || "ross", tid: el.dataset.t, st: "all", g: "2", ch: "all", sec: "all", lvl: "all", limit: 50 }; save(); go("practice"); },
     mockToggle: () => { S.ui.mockOpen = !S.ui.mockOpen; draftMistakes = []; save(); render(); },
     mxAdd: () => { draftMistakes.push({ tid: $("#mx_t").value, type: $("#mx_type").value, note: $("#mx_note").value.trim() }); $("#mx_note").value = ""; paintMistakes(); },
     mxDel: el => { draftMistakes.splice(+el.dataset.i, 1); paintMistakes(); },
