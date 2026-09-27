@@ -787,20 +787,24 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
       <p class="muted" style="margin-top:8px">Last saved automatically on every change. Items ticked: ${Object.keys(S.items).length} · notes: ${S.notes.length} · pomodoros: ${S.pomo.length} · mocks: ${S.mocks.length}.</p></div>`;
 
   /* ================= router & render ================= */
-  let current = "dashboard";
+  let current = (() => { const h = (location.hash || "").slice(1); return VIEWS[h] ? h : "dashboard"; })();
+  // Navigate in script; the claude.ai viewer does not reliably deliver #hash changes.
+  function go(view) {
+    current = VIEWS[view] ? view : "dashboard";
+    try { history.replaceState(null, "", "#" + current); } catch (e) { /* sandboxed */ }
+    render(); window.scrollTo(0, 0);
+  }
   function render() {
-    const h = (location.hash || "#dashboard").slice(1);
-    current = VIEWS[h] ? h : "dashboard";
     document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("active", a.dataset.v === current));
     $("#main").innerHTML = VIEWS[current]();
     if (current === "mocks") paintMistakes();
     updateBadge(); pPaint();
   }
-  window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+  window.addEventListener("hashchange", () => { const h = (location.hash || "").slice(1); if (VIEWS[h] && h !== current) go(h); });
 
   /* ================= actions ================= */
   const ACT = {
-    goto: el => { const t = TOPIC[el.dataset.t]; S.ui.subj = t.subj; S.ui.open[t.id] = true; save(); if (location.hash !== "#syllabus") location.hash = "#syllabus"; else render(); setTimeout(() => { const d = document.querySelector(`details.topic[data-t="${t.id}"]`); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60); },
+    goto: el => { const t = TOPIC[el.dataset.t]; S.ui.subj = t.subj; S.ui.open[t.id] = true; save(); if (current !== "syllabus") go("syllabus"); else render(); setTimeout(() => { const d = document.querySelector(`details.topic[data-t="${t.id}"]`); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60); },
     subj: el => { S.ui.subj = el.dataset.s; save(); render(); },
     expandAll: () => { SUBJ[S.ui.subj].topics.forEach(t => S.ui.open[t.id] = true); save(); render(); },
     collapseAll: () => { S.ui.open = {}; save(); render(); },
@@ -808,7 +812,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     tough: el => { const id = el.dataset.t; if (S.rev[id]) { removeRev(id); toast("Removed from Revision."); } else { addRev(id, "Marked tough"); toast("Added to Revision."); } save(); render(); },
     copyExplain: el => copy(explainPrompt(TOPIC[el.dataset.t])),
     copyPyq: el => copy(pyqPrompt(TOPIC[el.dataset.t])),
-    noteFor: el => { S.ui.noteSubj = TOPIC[el.dataset.t].subj; save(); location.hash = "#notes"; setTimeout(() => { const s = $("#nf_t"); if (s) { s.value = el.dataset.t; $("#nf_text").focus(); } }, 50); },
+    noteFor: el => { S.ui.noteSubj = TOPIC[el.dataset.t].subj; save(); go("notes"); setTimeout(() => { const s = $("#nf_t"); if (s) { s.value = el.dataset.t; $("#nf_text").focus(); } }, 50); },
     noteAdd: () => { const tid = $("#nf_t").value, text = $("#nf_text").value.trim(); if (!text) return toast("Write something first."); S.notes.push({ id: uid(), tid, subj: TOPIC[tid].subj, text, imp: $("#nf_imp").checked, date: today() }); save(); toast("Note saved to " + SUBJ[TOPIC[tid].subj].short + " short notes."); render(); },
     noteImp: el => { const n = S.notes.find(x => x.id === el.dataset.id); if (n) n.imp = !n.imp; save(); render(); },
     noteDel: el => { S.notes = S.notes.filter(x => x.id !== el.dataset.id); save(); render(); },
@@ -817,7 +821,7 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
     notesPrompt: () => copy(subjectNotesPrompt(SUBJ[S.ui.noteSubj] || SUBJ.la)),
     print: () => window.print(),
     dayDone: () => { const d = today(); S.daysDone[d] = !S.daysDone[d]; save(); if (S.daysDone[d]) toast("Great work today. Sleep on time 😴"); render(); },
-    pomoTopic: el => { P.tid = el.dataset.t; location.hash = "#pomodoro"; },
+    pomoTopic: el => { P.tid = el.dataset.t; go("pomodoro"); },
     pToggle: () => { P.running ? pPause() : pStart(); },
     pReset: () => pReset(),
     pSkip: () => { P.running = false; if (P.mode === "focus") { P.cycle++; P.mode = P.cycle % 4 === 0 ? "long" : "short"; } else P.mode = "focus"; P.left = null; render(); },
@@ -876,14 +880,19 @@ Tell me: (1) where I lost the most marks and why, (2) which topics to re-study v
   function checkAcc(id) { const st = ts(id); if (st.att >= 5 && st.cor / st.att < 0.6) { addRev(id, "PYQ accuracy " + Math.round(st.cor / st.att * 100) + "%"); toast("PYQ accuracy below 60%: added to Revision."); } }
 
   document.addEventListener("click", e => {
-    const el = e.target.closest("[data-act]"); if (!el) return;
+    const el = e.target.closest("[data-act]");
+    if (!el) {
+      const a = e.target.closest('a[href^="#"]');
+      if (a) { const v = a.getAttribute("href").slice(1); if (VIEWS[v]) { e.preventDefault(); go(v); } }
+      return;
+    }
     const fn = ACT[el.dataset.act]; if (!fn) return;
     if (el.tagName === "A" || el.tagName === "BUTTON") e.preventDefault();
     fn(el, e);
   });
   document.addEventListener("change", e => { const el = e.target.closest("[data-ch]"); if (el && CH[el.dataset.ch]) CH[el.dataset.ch](el, e); });
   document.addEventListener("toggle", e => { const d = e.target; if (d.matches && d.matches("details.topic")) { if (d.open) S.ui.open[d.dataset.t] = true; else delete S.ui.open[d.dataset.t]; save(); } }, true);
-  $("#miniTimer").addEventListener("click", () => { location.hash = "#pomodoro"; });
+  $("#miniTimer").addEventListener("click", () => go("pomodoro"));
 
   applyTheme();
   render();
